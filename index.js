@@ -52,6 +52,10 @@ function sparqlProxy (options) {
         res.setHeader(name, value)
       })
 
+      // content gets decoded, so remove encoding headers and recalculate length
+      res.removeHeader('content-encoding')
+      res.removeHeader('content-length')
+
       result.body.pipe(res)
     }).catch(next)
   }
