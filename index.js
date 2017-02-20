@@ -2,7 +2,7 @@
 
 'use strict'
 
-var clone = require('lodash/clone')
+var cloneDeep = require('lodash/cloneDeep')
 var defaults = require('lodash/defaults')
 var SparqlHttpClient = require('sparql-http-client')
 
@@ -45,7 +45,7 @@ function sparqlProxy (options) {
     log.debug({script: __filename}, 'SPARQL query:' + query)
 
     // merge configuration query options with request query options
-    var currentQueryOptions = defaults(clone(queryOptions), {accept: req.headers.accept})
+    var currentQueryOptions = defaults(cloneDeep(queryOptions), {accept: req.headers.accept})
 
     return client[queryOperation](query, currentQueryOptions).then(function (result) {
       result.headers.forEach(function (value, name) {
