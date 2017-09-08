@@ -1,10 +1,8 @@
-/* global log */
-
-'use strict'
-
-var cloneDeep = require('lodash/cloneDeep')
-var defaults = require('lodash/defaults')
-var SparqlHttpClient = require('sparql-http-client')
+const bodyParser = require('body-parser')
+const cloneDeep = require('lodash/cloneDeep')
+const defaults = require('lodash/defaults')
+const Router = require('express').Router
+const SparqlHttpClient = require('sparql-http-client')
 
 SparqlHttpClient.fetch = require('node-fetch')
 
@@ -13,25 +11,19 @@ function authBasicHeader (user, password) {
 }
 
 function sparqlProxy (options) {
-  if (options) {
-    var queryOptions = {}
+  const queryOptions = {}
 
-    if (options.authentication) {
-      queryOptions.headers = {
-        Authorization: authBasicHeader(options.authentication.user, options.authentication.password)
-      }
+  if (options.authentication) {
+    queryOptions.headers = {
+      Authorization: authBasicHeader(options.authentication.user, options.authentication.password)
     }
-
-    var queryOperation = options.queryOperation || 'postQueryDirect'
-    var client = new SparqlHttpClient({endpointUrl: options.endpointUrl})
   }
 
-  return function (req, res, next) {
-    if (!options) {
-      return next()
-    }
+  const queryOperation = options.queryOperation || 'postQueryDirect'
+  const client = new SparqlHttpClient({endpointUrl: options.endpointUrl})
 
-    var query
+  return (req, res, next) => {
+    let query
 
     if (req.method === 'GET') {
       query = req.query.query
@@ -41,14 +33,14 @@ function sparqlProxy (options) {
       return next()
     }
 
-    log.info({script: __filename}, 'handle SPARQL request for endpoint: ' + options.endpointUrl)
-    log.debug({script: __filename}, 'SPARQL query:' + query)
+    console.log('handle SPARQL request for endpoint: ' + options.endpointUrl)
+    console.log('SPARQL query:' + query)
 
     // merge configuration query options with request query options
-    var currentQueryOptions = defaults(cloneDeep(queryOptions), {accept: req.headers.accept})
+    const currentQueryOptions = defaults(cloneDeep(queryOptions), {accept: req.headers.accept})
 
-    return client[queryOperation](query, currentQueryOptions).then(function (result) {
-      result.headers.forEach(function (value, name) {
+    return client[queryOperation](query, currentQueryOptions).then((result) => {
+      result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
 
@@ -61,4 +53,14 @@ function sparqlProxy (options) {
   }
 }
 
-module.exports = sparqlProxy
+function factory (options) {
+  const router = new Router()
+
+  router.use(bodyParser.text({type: 'application/sparql-query'}))
+  router.use(bodyParser.urlencoded({extended: false}))
+  router.use(sparqlProxy(options))
+
+  return router
+}
+
+module.exports = factory

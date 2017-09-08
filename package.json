@@ -12,15 +12,19 @@
     "url": "https://github.com/zazukoians/sparql-proxy/issues"
   },
   "scripts": {
-    "lint": "standard",
-    "test": "npm run lint"
+    "test": "standard && mocha"
   },
   "dependencies": {
+    "body-parser": "^1.17.2",
+    "express": "^4.15.4",
     "lodash": "^4.16.4",
     "node-fetch": "^1.6.3",
     "sparql-http-client": "^1.0.1"
   },
   "devDependencies": {
-    "standard": "^8.6.0"
+    "mocha": "^3.5.0",
+    "nock": "^9.0.14",
+    "standard": "^8.6.0",
+    "supertest": "^3.0.0"
   }
 }
