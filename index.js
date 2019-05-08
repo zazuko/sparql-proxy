@@ -20,14 +20,14 @@ function sparqlProxy (options) {
     }
   }
 
-  const queryOperation = options.queryOperation || 'postQueryDirect'
+  let queryOperation = options.queryOperation || 'postQueryDirect'
   const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
 
   return (req, res, next) => {
     let query
 
     if (req.method === 'GET') {
-      query = req.query.query
+      query = req.query.query || ''
     } else if (req.method === 'POST') {
       query = req.body.query || req.body
     } else {
@@ -36,7 +36,12 @@ function sparqlProxy (options) {
     }
 
     console.log('handle SPARQL request for endpoint: ' + options.endpointUrl)
-    console.log('SPARQL query:' + query)
+    if (query) {
+      console.log('SPARQL query:' + query)
+    } else {
+      console.log('No SPARQL query; issuing a GET')
+      queryOperation = 'getQuery'
+    }
 
     // merge configuration query options with request query options
     const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
