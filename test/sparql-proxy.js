@@ -30,6 +30,31 @@ describe('sparql-proxy', () => {
     assert.strictEqual(res.text, query)
   })
 
+  it('should proxy with headers override', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/query',
+      fetchOptions: {
+        headers: {
+          'User-Agent': 'my-custom-ua'
+        }
+      }
+    }))
+
+    nock('http://example.org').post('/get/query').reply(
+      200,
+      (uri, body) => body,
+      { 'query-ua': (req) => req.headers['user-agent'].join(' ') }
+    )
+
+    const res = await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(200)
+      .expect('query-ua', 'my-custom-ua')
+    assert.strictEqual(res.text, query)
+  })
+
   it('should proxy GET with no query', async () => {
     const app = express()
 

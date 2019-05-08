@@ -14,6 +14,10 @@ function authBasicHeader (user, password) {
 function sparqlProxy (options) {
   const queryOptions = {}
 
+  if (options.fetchOptions) {
+    Object.assign(queryOptions, options.fetchOptions)
+  }
+
   if (options.authentication) {
     queryOptions.headers = {
       Authorization: authBasicHeader(options.authentication.user, options.authentication.password)
