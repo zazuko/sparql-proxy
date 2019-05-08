@@ -10,7 +10,7 @@ describe('sparql-proxy', () => {
   const query = 'SELECT * WHERE {?s ?p ?o.} LIMIT 10'
 
   it('should be a function', () => {
-    assert.equal(typeof sparqlProxy, 'function')
+    assert.strictEqual(typeof sparqlProxy, 'function')
   })
 
   it('should proxy GET query requests', () => {
@@ -28,7 +28,7 @@ describe('sparql-proxy', () => {
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
       .then((res) => {
-        assert.equal(res.text, query)
+        assert.strictEqual(res.text, query)
       })
   })
 
@@ -49,7 +49,7 @@ describe('sparql-proxy', () => {
       .send('query=' + encodeURIComponent(query))
       .expect(200)
       .then((res) => {
-        assert.equal(res.text, query)
+        assert.strictEqual(res.text, query)
       })
   })
 
@@ -70,7 +70,7 @@ describe('sparql-proxy', () => {
       .send(query)
       .expect(200)
       .then((res) => {
-        assert.equal(res.text, query)
+        assert.strictEqual(res.text, query)
       })
   })
 
@@ -93,7 +93,7 @@ describe('sparql-proxy', () => {
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
       .then((res) => {
-        assert.equal(res.text, 'Basic dXNlcjpwYXNzd29yZA==')
+        assert.strictEqual(res.text, 'Basic dXNlcjpwYXNzd29yZA==')
       })
   })
 
@@ -108,13 +108,13 @@ describe('sparql-proxy', () => {
       }
     }))
 
-    nock('http://example.org').post('/forward-headers/query').reply(200, query, {'endpoint-header': 'test'})
+    nock('http://example.org').post('/forward-headers/query').reply(200, query, { 'endpoint-header': 'test' })
 
     return request(app)
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
       .then((res) => {
-        assert.equal(res.headers['endpoint-header'], 'test')
+        assert.strictEqual(res.headers['endpoint-header'], 'test')
       })
   })
 
