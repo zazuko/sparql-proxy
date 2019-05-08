@@ -24,3 +24,9 @@ app.use(sparqlProxy({
   endpointUrl: 'https://dbpedia.org/sparql'
 })
 ```
+
+## Debug
+
+This package uses [`debug`](https://www.npmjs.com/package/debug), you can get debug logging via: `DEBUG=sparql-proxy`.  
+Since [Trifid](https://github.com/zazuko/trifid) makes heavy use of this package, using `DEBUG=trifid:*` also enables
+logging in this package.
