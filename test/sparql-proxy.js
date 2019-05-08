@@ -13,7 +13,7 @@ describe('sparql-proxy', () => {
     assert.strictEqual(typeof sparqlProxy, 'function')
   })
 
-  it('should proxy GET query requests', () => {
+  it('should proxy GET query requests', async () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
@@ -24,15 +24,28 @@ describe('sparql-proxy', () => {
       return body
     })
 
-    return request(app)
+    const res = await request(app)
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
-      .then((res) => {
-        assert.strictEqual(res.text, query)
-      })
+    assert.strictEqual(res.text, query)
   })
 
-  it('should proxy URL encoded POST query requests', () => {
+  it('should proxy GET with no query', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/query'
+    }))
+
+    nock('http://example.org').get('/get/query?query=').reply(200, () => 'Nothing')
+
+    const res = await request(app)
+      .get('/query')
+      .expect(200)
+    assert.strictEqual(res.text, 'Nothing')
+  })
+
+  it('should proxy URL encoded POST query requests', async () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
@@ -43,17 +56,15 @@ describe('sparql-proxy', () => {
       return body
     })
 
-    return request(app)
+    const res = await request(app)
       .post('/query')
       .set('content-type', 'application/x-www-form-urlencoded')
       .send('query=' + encodeURIComponent(query))
       .expect(200)
-      .then((res) => {
-        assert.strictEqual(res.text, query)
-      })
+    assert.strictEqual(res.text, query)
   })
 
-  it('should proxy direct POST query requests', () => {
+  it('should proxy direct POST query requests', async () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
@@ -64,17 +75,15 @@ describe('sparql-proxy', () => {
       return body
     })
 
-    return request(app)
+    const res = await request(app)
       .post('/query')
       .set('content-type', 'application/sparql-query')
       .send(query)
       .expect(200)
-      .then((res) => {
-        assert.strictEqual(res.text, query)
-      })
+    assert.strictEqual(res.text, query)
   })
 
-  it('should use authentication if given', () => {
+  it('should use authentication if given', async () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
@@ -89,15 +98,13 @@ describe('sparql-proxy', () => {
       return this.req.headers.authorization[0]
     })
 
-    return request(app)
+    const res = await request(app)
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
-      .then((res) => {
-        assert.strictEqual(res.text, 'Basic dXNlcjpwYXNzd29yZA==')
-      })
+    assert.strictEqual(res.text, 'Basic dXNlcjpwYXNzd29yZA==')
   })
 
-  it('should forward header from endpoint', () => {
+  it('should forward header from endpoint', async () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
@@ -110,12 +117,10 @@ describe('sparql-proxy', () => {
 
     nock('http://example.org').post('/forward-headers/query').reply(200, query, { 'endpoint-header': 'test' })
 
-    return request(app)
+    const res = await request(app)
       .get('/query?query=' + encodeURIComponent(query))
       .expect(200)
-      .then((res) => {
-        assert.strictEqual(res.headers['endpoint-header'], 'test')
-      })
+    assert.strictEqual(res.headers['endpoint-header'], 'test')
   })
 
   it('should ignore unknown methods', () => {
