@@ -1,13 +1,14 @@
 const bodyParser = require('body-parser')
 const cloneDeep = require('lodash/cloneDeep')
 const defaults = require('lodash/defaults')
+const fetch = require('node-fetch')
 const Router = require('express').Router
 const SparqlHttpClient = require('sparql-http-client')
 
-SparqlHttpClient.fetch = require('node-fetch')
+SparqlHttpClient.fetch = fetch
 
 function authBasicHeader (user, password) {
-  return 'Basic ' + new Buffer(user + ':' + password).toString('base64')
+  return 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
 }
 
 function sparqlProxy (options) {
@@ -20,7 +21,7 @@ function sparqlProxy (options) {
   }
 
   const queryOperation = options.queryOperation || 'postQueryDirect'
-  const client = new SparqlHttpClient({endpointUrl: options.endpointUrl})
+  const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
 
   return (req, res, next) => {
     let query
@@ -30,14 +31,15 @@ function sparqlProxy (options) {
     } else if (req.method === 'POST') {
       query = req.body.query || req.body
     } else {
-      return next()
+      next()
+      return
     }
 
     console.log('handle SPARQL request for endpoint: ' + options.endpointUrl)
     console.log('SPARQL query:' + query)
 
     // merge configuration query options with request query options
-    const currentQueryOptions = defaults(cloneDeep(queryOptions), {accept: req.headers.accept})
+    const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
 
     return client[queryOperation](query, currentQueryOptions).then((result) => {
       result.headers.forEach((value, name) => {
@@ -56,8 +58,8 @@ function sparqlProxy (options) {
 function factory (options) {
   const router = new Router()
 
-  router.use(bodyParser.text({type: 'application/sparql-query'}))
-  router.use(bodyParser.urlencoded({extended: false}))
+  router.use(bodyParser.text({ type: 'application/sparql-query' }))
+  router.use(bodyParser.urlencoded({ extended: false }))
   router.use(sparqlProxy(options))
 
   return router
