@@ -19,14 +19,14 @@
     "body-parser": "^1.17.2",
     "express": "^4.15.4",
     "lodash": "^4.16.4",
-    "node-fetch": "^1.6.3",
+    "node-fetch": "^2.5.0",
     "sparql-http-client": "^1.0.1"
   },
   "devDependencies": {
-    "mocha": "^3.5.0",
-    "nock": "^9.0.14",
+    "mocha": "^6.1.4",
+    "nock": "^10.0.6",
     "standard": "^12.0.1",
-    "supertest": "^3.0.0"
+    "supertest": "^4.0.2"
   },
   "engines": {
     "node": ">=8",
