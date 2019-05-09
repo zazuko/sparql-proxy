@@ -1,11 +1,16 @@
 const bodyParser = require('body-parser')
 const cloneDeep = require('lodash/cloneDeep')
+const debug = require('debug')
 const defaults = require('lodash/defaults')
 const fetch = require('node-fetch')
 const Router = require('express').Router
 const SparqlHttpClient = require('sparql-http-client')
-
 SparqlHttpClient.fetch = fetch
+
+if (debug.enabled('trifid:*')) {
+  debug.enable('sparql-proxy')
+}
+const logger = debug('sparql-proxy')
 
 function authBasicHeader (user, password) {
   return 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
@@ -39,11 +44,11 @@ function sparqlProxy (options) {
       return
     }
 
-    console.log('handle SPARQL request for endpoint: ' + options.endpointUrl)
+    logger('handle SPARQL request for endpoint: ' + options.endpointUrl)
     if (query) {
-      console.log('SPARQL query:' + query)
+      logger('SPARQL query:' + query)
     } else {
-      console.log('No SPARQL query; issuing a GET')
+      logger('No SPARQL query; issuing a GET')
       queryOperation = 'getQuery'
     }
 

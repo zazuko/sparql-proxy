@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "body-parser": "^1.17.2",
+    "debug": "^4.1.1",
     "express": "^4.15.4",
     "lodash": "^4.16.4",
     "node-fetch": "^2.5.0",
