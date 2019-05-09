@@ -8,8 +8,10 @@ const SparqlHttpClient = require('sparql-http-client')
 SparqlHttpClient.fetch = fetch
 
 if (debug.enabled('trifid:*')) {
-  debug.enable('sparql-proxy')
+  const enabled = debug.disable()
+  debug.enable(`${enabled},sparql-proxy`)
 }
+
 const logger = debug('sparql-proxy')
 
 function authBasicHeader (user, password) {
