@@ -38,7 +38,7 @@ function sparqlProxy (options) {
     let query
 
     if (req.method === 'GET') {
-      query = req.query.query || ''
+      query = req.query.query
     } else if (req.method === 'POST') {
       query = req.body.query || req.body
     } else {

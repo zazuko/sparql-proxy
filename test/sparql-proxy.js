@@ -62,7 +62,7 @@ describe('sparql-proxy', () => {
       endpointUrl: 'http://example.org/get/query'
     }))
 
-    nock('http://example.org').get('/get/query?query=').reply(200, () => 'Nothing')
+    nock('http://example.org').get('/get/query').reply(200, () => 'Nothing')
 
     const res = await request(app)
       .get('/query')
