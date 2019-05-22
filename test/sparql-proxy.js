@@ -20,9 +20,7 @@ describe('sparql-proxy', () => {
       endpointUrl: 'http://example.org/get/query'
     }))
 
-    nock('http://example.org').post('/get/query').reply(200, function (uri, body) {
-      return body
-    })
+    nock('http://example.org').post('/get/query').reply(200, (uri, body) => body)
 
     const res = await request(app)
       .get('/query?query=' + encodeURIComponent(query))
@@ -77,9 +75,7 @@ describe('sparql-proxy', () => {
       endpointUrl: 'http://example.org/post-url-encoded/query'
     }))
 
-    nock('http://example.org').post('/post-url-encoded/query').reply(200, function (uri, body) {
-      return body
-    })
+    nock('http://example.org').post('/post-url-encoded/query').reply(200, (uri, body) => body)
 
     const res = await request(app)
       .post('/query')
@@ -96,9 +92,7 @@ describe('sparql-proxy', () => {
       endpointUrl: 'http://example.org/post-url-encoded/query'
     }))
 
-    nock('http://example.org').post('/post-url-encoded/query').reply(200, function (uri, body) {
-      return body
-    })
+    nock('http://example.org').post('/post-url-encoded/query').reply(200, (uri, body) => body)
 
     const res = await request(app)
       .post('/query')

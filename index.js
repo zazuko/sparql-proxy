@@ -57,7 +57,9 @@ function sparqlProxy (options) {
     // merge configuration query options with request query options
     const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
 
+    const timeStart = Date.now()
     return client[queryOperation](query, currentQueryOptions).then((result) => {
+      const time = Date.now() - timeStart
       result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
@@ -67,6 +69,11 @@ function sparqlProxy (options) {
       res.removeHeader('content-length')
 
       result.body.pipe(res)
+      if (debug.enabled('sparql-proxy')) {
+        return result.text().then((text) => {
+          logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
+        })
+      }
     }).catch(next)
   }
 }
