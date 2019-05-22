@@ -7,7 +7,7 @@ const Router = require('express').Router
 const SparqlHttpClient = require('sparql-http-client')
 SparqlHttpClient.fetch = fetch
 
-if (debug.enabled('trifid:*')) {
+if (debug.enabled('trifid:*,')) {
   const enabled = debug.disable()
   debug.enable(`${enabled},sparql-proxy`)
 }
