@@ -3,13 +3,13 @@
   "description": "SPARQL proxy middleware",
   "version": "2.2.2",
   "license": "MIT",
-  "homepage": "https://github.com/zazukoians/sparql-proxy",
+  "homepage": "https://github.com/zazuko/sparql-proxy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zazukoians/sparql-proxy.git"
+    "url": "https://github.com/zazuko/sparql-proxy.git"
   },
   "bugs": {
-    "url": "https://github.com/zazukoians/sparql-proxy/issues"
+    "url": "https://github.com/zazuko/sparql-proxy/issues"
   },
   "scripts": {
     "pretest": "standard",
