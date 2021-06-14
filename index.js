@@ -1,3 +1,4 @@
+const api = require('@opentelemetry/api')
 const bodyParser = require('body-parser')
 const cloneDeep = require('lodash/cloneDeep')
 const debug = require('debug')
@@ -6,6 +7,8 @@ const fetch = require('node-fetch')
 const Router = require('express').Router
 const SparqlHttpClient = require('sparql-http-client')
 SparqlHttpClient.fetch = fetch
+
+const tracer = api.trace.getTracer('sparql-proxy')
 
 if (debug.enabled('trifid:*,')) {
   const enabled = debug.disable()
@@ -35,46 +38,56 @@ function sparqlProxy (options) {
   const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
 
   return (req, res, next) => {
-    let query
+    tracer.startActiveSpan('sparqlProxy', span => {
+      let query
 
-    if (req.method === 'GET') {
-      query = req.query.query
-    } else if (req.method === 'POST') {
-      query = req.body.query || req.body
-    } else {
-      next()
-      return
-    }
-
-    logger('handle SPARQL request for endpoint: ' + options.endpointUrl)
-    if (query) {
-      logger('SPARQL query:' + query)
-    } else {
-      logger('No SPARQL query; issuing a GET')
-      queryOperation = 'getQuery'
-    }
-
-    // merge configuration query options with request query options
-    const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
-
-    const timeStart = Date.now()
-    return client[queryOperation](query, currentQueryOptions).then((result) => {
-      const time = Date.now() - timeStart
-      result.headers.forEach((value, name) => {
-        res.setHeader(name, value)
-      })
-
-      // content gets decoded, so remove encoding headers and recalculate length
-      res.removeHeader('content-encoding')
-      res.removeHeader('content-length')
-
-      result.body.pipe(res)
-      if (debug.enabled('sparql-proxy')) {
-        return result.text().then((text) => {
-          logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
-        })
+      if (req.method === 'GET') {
+        query = req.query.query
+      } else if (req.method === 'POST') {
+        query = req.body.query || req.body
+      } else {
+        next()
+        span.end()
+        return
       }
-    }).catch(next)
+
+      logger('handle SPARQL request for endpoint: ' + options.endpointUrl)
+      if (query) {
+        logger('SPARQL query:' + query)
+      } else {
+        logger('No SPARQL query; issuing a GET')
+        queryOperation = 'getQuery'
+      }
+
+      span.setAttribute('db.statement', query)
+
+      // merge configuration query options with request query options
+      const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
+
+      const timeStart = Date.now()
+      return client[queryOperation](query, currentQueryOptions).then((result) => {
+        const time = Date.now() - timeStart
+        result.headers.forEach((value, name) => {
+          res.setHeader(name, value)
+        })
+
+        // content gets decoded, so remove encoding headers and recalculate length
+        res.removeHeader('content-encoding')
+        res.removeHeader('content-length')
+
+        result.body.pipe(res)
+        if (debug.enabled('sparql-proxy')) {
+          return result.text().then((text) => {
+            logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
+          })
+        }
+      }).catch(err => {
+          span.recordException(err)
+          return next(err)
+      }).finally(() => {
+        span.end()
+      })
+    })
   }
 }
 
