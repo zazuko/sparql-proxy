@@ -14,6 +14,17 @@ if (debug.enabled('trifid:*,')) {
 
 const logger = debug('sparql-proxy')
 
+const DEFAULT_TIMEOUT = 2000 // ms
+function forwardStatusCode (statusCode) {
+  switch (statusCode) {
+    case 404:
+      return 502
+    case 500:
+      return 502
+  }
+  return statusCode
+}
+
 function authBasicHeader (user, password) {
   return 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
 }
@@ -58,6 +69,13 @@ function sparqlProxy (options) {
     const currentQueryOptions = defaults(cloneDeep(queryOptions), { accept: req.headers.accept })
 
     const timeStart = Date.now()
+
+    setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(504).send(`timeout after ${options.timeout} ms`)
+      }
+    }, options.timeout || DEFAULT_TIMEOUT)
+
     return client[queryOperation](query, currentQueryOptions).then((result) => {
       const time = Date.now() - timeStart
       result.headers.forEach((value, name) => {
@@ -68,13 +86,22 @@ function sparqlProxy (options) {
       res.removeHeader('content-encoding')
       res.removeHeader('content-length')
 
+      res.status(forwardStatusCode(result.status))
       result.body.pipe(res)
       if (debug.enabled('sparql-proxy')) {
         return result.text().then((text) => {
           logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
         })
       }
-    }).catch(next)
+    }).catch((reason) => {
+      if (reason.code === 'ETIMEDOUT') {
+        res.status(504).send(reason)
+      } else if (reason.code === 'ENOTFOUND' || reason.code === 'ECONNRESET' || reason.code === 'ECONNREFUSED') {
+        res.status(502).send(reason)
+      } else {
+        next()
+      }
+    })
   }
 }
 
