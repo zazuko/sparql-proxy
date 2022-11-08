@@ -1,7 +1,7 @@
 {
   "name": "sparql-proxy",
   "description": "SPARQL proxy middleware",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "license": "MIT",
   "homepage": "https://github.com/zazuko/sparql-proxy",
   "repository": {
