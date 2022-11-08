@@ -155,4 +155,77 @@ describe('sparql-proxy', () => {
       .send(query)
       .expect(404)
   })
+
+  it('should assign 502 when gets a 500 from server', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/query'
+    }))
+
+    nock('http://example.org').post('/get/query').reply(500, (uri, body) => body)
+
+    const res = await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(502)
+    assert.strictEqual(res.text, query)
+  })
+
+  it('should assign 502 when gets a 404 from server', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/query'
+    }))
+
+    nock('http://example.org').post('/get/query').reply(404, (uri, body) => body)
+
+    const res = await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(502)
+    assert.strictEqual(res.text, query)
+  })
+
+  it('should assign 504 for timeouts from endpoint', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/query',
+      timeout: 200
+    }))
+
+    nock('http://example.org').post('/get/query').delayConnection(400).reply(200, (uri, body) => body)
+
+    const res = await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(504)
+    assert.strictEqual(res.text, 'timeout after 200 ms')
+  })
+
+  it('should assign 502 when endpoint is not reachable', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://non-reachable.org/404'
+    }))
+
+    await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(502)
+  })
+
+  it('should assign 502 when socket hangs up', async () => {
+    const app = express()
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/get/reset'
+    }))
+
+    nock('http://example.org').post('/get/reset')
+      .replyWithError({ code: 'ECONNRESET' })
+
+    await request(app)
+      .get('/query?query=' + encodeURIComponent(query))
+      .expect(502)
+  })
 })
