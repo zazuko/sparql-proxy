@@ -1,5 +1,5 @@
 {
-  "name": "sparql-proxy",
+  "name": "@zazuko/sparql-proxy",
   "description": "SPARQL proxy middleware",
   "version": "2.4.0",
   "license": "MIT",
