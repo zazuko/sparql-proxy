@@ -14,6 +14,7 @@ The following options are supported:
 - `queryOperation`: The query operation which will be used to access the SPARQL endpoint (default: `postQueryDirect`)
 - `fetchOptions`: an object that will be merged (and potentially override) with
   [node-fetch options](https://github.com/bitinn/node-fetch/blob/bf8b4e8db350ec76dbb9236620f774fcc21b8c12/README.md#options) used for the request from the proxy to the SPARQL endpoint. It can be used to override fetch headers: `fetchOptions.headers`
+- `timeout`: configure a timeout in milliseconds (default value: `20000`)
 
 ## Example
 
