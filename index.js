@@ -14,7 +14,7 @@ if (debug.enabled('trifid:*,')) {
 
 const logger = debug('sparql-proxy')
 
-const DEFAULT_TIMEOUT = 2000 // ms
+const DEFAULT_TIMEOUT = 20000 // ms
 function forwardStatusCode (statusCode) {
   switch (statusCode) {
     case 404:
@@ -70,11 +70,14 @@ function sparqlProxy (options) {
 
     const timeStart = Date.now()
 
+    const timeout = options.timeout || DEFAULT_TIMEOUT
     setTimeout(() => {
       if (!res.headersSent) {
-        res.status(504).send(`timeout after ${options.timeout} ms`)
+        res.status(504)
+          .send(
+            `timeout after ${timeout} ms${options.timeout ? '' : ' (sparql-proxy default)'}`)
       }
-    }, options.timeout || DEFAULT_TIMEOUT)
+    }, timeout)
 
     return client[queryOperation](query, currentQueryOptions).then((result) => {
       const time = Date.now() - timeStart
