@@ -110,4 +110,46 @@ describe('redis cache for sparql-proxy', () => {
       .expect(200)
     assert.strictEqual(res3.text, '0')
   })
+
+  it('should not hit cached response (cache disabled)', async () => {
+    const app = express()
+
+    let counter = 0
+
+    nock('http://example.org')
+      .post('/query')
+      .times(3)
+      .reply(200, (_uri, _body) => {
+        return counter++
+      })
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/query',
+      cache: {
+        url: 'redis://127.0.0.1:6379',
+        disabled: true
+      }
+    }))
+
+    const res1 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res1.text, '0')
+
+    const res2 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res2.text, '1')
+
+    const res3 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res3.text, '2')
+  })
 })
