@@ -65,6 +65,7 @@ const getRedisClient = async (options) => {
     }
     logger(`Cache: removed all entries in Redis that match the following pattern: '${cachePrefix}:*'. Done!`)
   }
+  await client.disconnect()
 
   return {
     client,
@@ -113,7 +114,7 @@ const sparqlProxy = (options) => {
       if (redisClient) {
         cacheTtl = redisClient.ttl
         cachePrefix = redisClient.prefix
-        cacheClient = redisClient.client
+        cacheClient = redisClient.client.duplicate()
         cacheEnabled = true
       }
     } catch (e) {
@@ -154,25 +155,31 @@ const sparqlProxy = (options) => {
 
     if (cacheEnabled) {
       cacheKey = cacheKeyName(cachePrefix, sha1(query))
-      const cacheResponse = await cacheClient.get(cacheKey)
-      const jsonResponse = JSON.parse(cacheResponse)
-      if (cacheResponse) {
-        const cacheData = jsonResponse.data || ''
-        const cacheHeaders = jsonResponse.headers || {}
-        const cacheStatus = jsonResponse.status || 500
-        Object.entries(cacheHeaders).forEach((header) => {
-          res.setHeader(header[0], header[1])
-        })
+      try {
+        await cacheClient.connect()
+        const cacheResponse = await cacheClient.get(cacheKey)
+        await cacheClient.disconnect()
+        const jsonResponse = JSON.parse(cacheResponse)
+        if (cacheResponse) {
+          const cacheData = jsonResponse.data || ''
+          const cacheHeaders = jsonResponse.headers || {}
+          const cacheStatus = jsonResponse.status || 500
+          Object.entries(cacheHeaders).forEach((header) => {
+            res.setHeader(header[0], header[1])
+          })
 
-        // content gets decoded, so remove encoding headers and recalculate length
-        res.removeHeader('content-encoding')
-        res.removeHeader('content-length')
+          // content gets decoded, so remove encoding headers and recalculate length
+          res.removeHeader('content-encoding')
+          res.removeHeader('content-length')
 
-        res.status(forwardStatusCode(cacheStatus))
-        logger(`cache: use response from '${cacheKey}' entry: ${cacheData}`)
-        res.send(cacheData)
+          res.status(forwardStatusCode(cacheStatus))
+          logger(`cache: use response from '${cacheKey}' entry: ${cacheData}`)
+          res.send(cacheData)
 
-        return
+          return
+        }
+      } catch (e) {
+        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to get cache entry', e)
       }
     }
 
@@ -187,12 +194,15 @@ const sparqlProxy = (options) => {
           result.headers.forEach((value, name) => {
             responseHeaders[name] = value
           })
+
+          await cacheClient.connect()
           await cacheClient.set(cacheKey, JSON.stringify({
             headers: responseHeaders,
             status: result.status,
             data: responseText
           }))
           await cacheClient.expire(cacheKey, cacheTtl)
+          await cacheClient.disconnect()
         }
       } catch (e) {
         console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)

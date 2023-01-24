@@ -8,6 +8,7 @@ const sparqlProxy = require('..')
 
 describe('redis cache for sparql-proxy', () => {
   const query = 'SELECT * WHERE {?s ?p ?o.} LIMIT 10'
+  const redisHost = process.env.CI ? 'redis' : '127.0.0.1'
 
   it('should not crash even if redis is not recheable', async () => {
     const app = express()
@@ -51,6 +52,7 @@ describe('redis cache for sparql-proxy', () => {
     const res1 = await request(app)
       .post('/query')
       .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
       .expect(200)
     assert.strictEqual(res1.text, '0')
 
@@ -67,5 +69,46 @@ describe('redis cache for sparql-proxy', () => {
       .send('query=' + encodeURIComponent(query))
       .expect(200)
     assert.strictEqual(res3.text, '2')
+  })
+
+  it('should hit cached response', async () => {
+    const app = express()
+
+    let counter = 0
+
+    nock('http://example.org')
+      .post('/query')
+      .times(3)
+      .reply(200, (_uri, _body) => {
+        return counter++
+      })
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/query',
+      cache: {
+        url: `redis://${redisHost}:6379`
+      }
+    }))
+
+    const res1 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res1.text, '0')
+
+    const res2 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res2.text, '0')
+
+    const res3 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res3.text, '0')
   })
 })
