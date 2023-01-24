@@ -99,7 +99,7 @@ const getRedisClient = async (options) => {
  *
  * @param {string} prefix The prefix to use for the cache key.
  * @param {string} name The name of the key to use for the cache.
- * @returns The prefixed cache key.
+ * @returns {string} The prefixed cache key.
  */
 const cacheKeyName = (prefix, name) => {
   return `${prefix}:${name}`
@@ -141,19 +141,20 @@ const sparqlProxy = (options) => {
 
   if (options.authentication) {
     queryOptions.headers = {
-      Authorization: authBasicHeader(options.authentication.user,
-        options.authentication.password)
+      Authorization: authBasicHeader(
+        options.authentication.user,
+        options.authentication.password
+      )
     }
   }
+
+  let queryOperation = options.queryOperation || 'postQueryDirect'
+  const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
 
   // init cache
   let cacheTtl = 0
   let cachePrefix = 'default'
   let cacheClient = null
-
-  let queryOperation = options.queryOperation || 'postQueryDirect'
-  const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
-
   const redisClientPromise = getRedisClient(options.cache || {}).catch((reason) => {
     console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to init cache', reason)
   })
@@ -205,13 +206,18 @@ const sparqlProxy = (options) => {
     }
 
     if (cacheClient) {
-      cacheKey = cacheKeyName(cachePrefix, sha1(query || 'get-query'))
+      cacheKey = query
+        ? cacheKeyName(cachePrefix, sha1(query))
+        : cacheKeyName(cachePrefix, 'get-query')
+
       try {
+        // try to get the result from the cache
         await cacheClient.connect()
         const cacheResponse = await cacheClient.get(cacheKey)
         await cacheClient.disconnect()
-        const jsonResponse = JSON.parse(cacheResponse)
+
         if (cacheResponse) {
+          const jsonResponse = JSON.parse(cacheResponse)
           const cacheData = jsonResponse.data || ''
           const cacheHeaders = jsonResponse.headers || {}
           const cacheStatus = jsonResponse.status || 500
