@@ -16,6 +16,10 @@ if (debug.enabled('trifid:*,')) {
 
 const logger = debug('sparql-proxy')
 
+const toBoolean = (value) => {
+  return `${value}`.toLocaleLowerCase() === 'true'
+}
+
 const forwardStatusCode = (statusCode) => {
   switch (statusCode) {
     case 404:
@@ -36,7 +40,7 @@ const sha1 = (data) => {
 
 const getRedisClient = async (options) => {
   const { url, ttl, clearAtStartup, disabled, prefix } = options
-  if (!url || disabled) {
+  if (!url || toBoolean(disabled)) {
     return null
   }
   logger(`Cache: enabled.`)
@@ -51,7 +55,7 @@ const getRedisClient = async (options) => {
   await client.ping()
 
   // remove all cache entries at startup if configured that way
-  if (clearAtStartup && clearAtStartup !== 'false') {
+  if (toBoolean(clearAtStartup)) {
     logger(`Cache: remove all entries in Redis that match the following pattern: '${cachePrefix}:*'…`)
     for await (const key of client.scanIterator({
       MATCH: `${cachePrefix}:*`
