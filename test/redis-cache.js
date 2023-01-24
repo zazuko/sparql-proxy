@@ -202,4 +202,62 @@ describe('redis cache for sparql-proxy', () => {
       .expect(200)
     assert.strictEqual(res3.text, '2')
   })
+
+  it('should be able to configure a TTL', async () => {
+    const app = express()
+
+    let counter = 0
+
+    nock('http://example.org')
+      .post('/query')
+      .times(3)
+      .reply(200, (_uri, _body) => {
+        return counter++
+      })
+
+    // we make sure that the cache get cleared at startup
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/query',
+      cache: {
+        url: 'redis://127.0.0.1:6379',
+        clearAtStartup: true,
+        ttl: 1
+      }
+    }))
+
+    // first request: create the cache entry
+    const res1 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res1.text, '0')
+
+    // second request: we expect to get the result from the cache
+    const res2 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res2.text, '0')
+
+    // wait a bit more than the TTL, so that the cache entry gets deleted
+    await new Promise(resolve => setTimeout(resolve, 1200))
+
+    // third request: we should get a fresh result from the endpoint
+    const res3 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res3.text, '1')
+
+    // fourth request: we should get the cached answer
+    const res4 = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res4.text, '1')
+  })
 })
