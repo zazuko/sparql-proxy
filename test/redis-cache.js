@@ -8,7 +8,6 @@ const sparqlProxy = require('..')
 
 describe('redis cache for sparql-proxy', () => {
   const query = 'SELECT * WHERE {?s ?p ?o.} LIMIT 10'
-  const redisHost = process.env.CI ? 'redis' : '127.0.0.1'
 
   it('should not crash even if redis is not recheable', async () => {
     const app = express()
@@ -86,7 +85,7 @@ describe('redis cache for sparql-proxy', () => {
     app.use('/query', sparqlProxy({
       endpointUrl: 'http://example.org/query',
       cache: {
-        url: `redis://${redisHost}:6379`
+        url: 'redis://127.0.0.1:6379'
       }
     }))
 
