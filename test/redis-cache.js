@@ -9,6 +9,33 @@ const sparqlProxy = require('..')
 describe('redis cache for sparql-proxy', () => {
   const query = 'SELECT * WHERE {?s ?p ?o.} LIMIT 10'
 
+  it('should start without crash (reset cache + simple request)', async () => {
+    const app = express()
+
+    let counter = 0
+
+    nock('http://example.org')
+      .post('/query')
+      .reply(200, (_uri, _body) => {
+        return counter++
+      })
+
+    app.use('/query', sparqlProxy({
+      endpointUrl: 'http://example.org/query',
+      cache: {
+        url: 'redis://127.0.0.1:6379',
+        clearAtStartup: true
+      }
+    }))
+
+    const res = await request(app)
+      .post('/query')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('query=' + encodeURIComponent(query))
+      .expect(200)
+    assert.strictEqual(res.text, '0')
+  })
+
   it('should not crash even if redis is not recheable', async () => {
     const app = express()
 
