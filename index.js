@@ -16,6 +16,12 @@ if (debug.enabled('trifid:*,')) {
 
 const logger = debug('sparql-proxy')
 
+/**
+ * Get a boolean value from a string or a boolean.
+ *
+ * @param {boolean | string} value The value to check.
+ * @returns {boolean} Boolean value.
+ */
 const toBoolean = (value) => {
   return `${value}`.toLocaleLowerCase() === 'true'
 }
@@ -30,10 +36,24 @@ const forwardStatusCode = (statusCode) => {
   return statusCode
 }
 
+/**
+ * Generate the value for the Authorization header for basic authentication.
+ *
+ * @param {string} user The username.
+ * @param {string} password The password of that user.
+ * @returns {string} The value of the Authorization to use.
+ */
 const authBasicHeader = (user, password) => {
-  return 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
+  const base64String = Buffer.from(`${user}:${password}`).toString('base64')
+  return `Basic ${base64String}`
 }
 
+/**
+ * Generate a SHA1 representation of a string.
+ *
+ * @param {string} data Data to encrypt using SHA1.
+ * @returns SHA1 representation of the `data` string.
+ */
 const sha1 = (data) => {
   return crypto.createHash('sha1').update(data, 'binary').digest('hex')
 }
@@ -74,8 +94,42 @@ const getRedisClient = async (options) => {
   }
 }
 
+/**
+ * Generate a cache key using a prefix.
+ *
+ * @param {string} prefix The prefix to use for the cache key.
+ * @param {string} name The name of the key to use for the cache.
+ * @returns The prefixed cache key.
+ */
 const cacheKeyName = (prefix, name) => {
   return `${prefix}:${name}`
+}
+
+/**
+ * Store an entry in the cache.
+ *
+ * @param {import('@redis/client').RedisClientType} cacheClient Redis client.
+ * @param {Response} result Response to store in the cache.
+ * @param {string} cacheKey key for the cache entry.
+ * @param {number} cacheTtl TTL for the cache entry.
+ */
+const cacheResult = async (cacheClient, result, cacheKey, cacheTtl) => {
+  if (cacheClient && result.status < 400) {
+    const responseText = await result.text()
+    const responseHeaders = {}
+    result.headers.forEach((value, name) => {
+      responseHeaders[name] = value
+    })
+
+    await cacheClient.connect()
+    await cacheClient.set(cacheKey, JSON.stringify({
+      headers: responseHeaders,
+      status: result.status,
+      data: responseText
+    }))
+    await cacheClient.expire(cacheKey, cacheTtl)
+    await cacheClient.disconnect()
+  }
 }
 
 const sparqlProxy = (options) => {
@@ -107,7 +161,6 @@ const sparqlProxy = (options) => {
   return async (req, res, next) => {
     let query
 
-    let cacheEnabled = false
     let cacheKey = `${cachePrefix}:default`
     try {
       const redisClient = await redisClientPromise
@@ -115,7 +168,6 @@ const sparqlProxy = (options) => {
         cacheTtl = redisClient.ttl
         cachePrefix = redisClient.prefix
         cacheClient = redisClient.client.duplicate()
-        cacheEnabled = true
       }
     } catch (e) {
       console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to init cache', e)
@@ -136,7 +188,6 @@ const sparqlProxy = (options) => {
     } else {
       logger('No SPARQL query; issuing a GET')
       queryOperation = 'getQuery'
-      cacheEnabled = false
     }
 
     // merge configuration query options with request query options
@@ -153,8 +204,8 @@ const sparqlProxy = (options) => {
       }, options.timeout)
     }
 
-    if (cacheEnabled) {
-      cacheKey = cacheKeyName(cachePrefix, sha1(query))
+    if (cacheClient) {
+      cacheKey = cacheKeyName(cachePrefix, sha1(query || 'get-query'))
       try {
         await cacheClient.connect()
         const cacheResponse = await cacheClient.get(cacheKey)
@@ -171,6 +222,7 @@ const sparqlProxy = (options) => {
           // content gets decoded, so remove encoding headers and recalculate length
           res.removeHeader('content-encoding')
           res.removeHeader('content-length')
+          res.removeHeader('set-cookie')
 
           res.status(forwardStatusCode(cacheStatus))
           logger(`cache: use response from '${cacheKey}' entry: ${cacheData}`)
@@ -188,22 +240,7 @@ const sparqlProxy = (options) => {
 
       // store results in cache, but don't make the app crash in case of issue
       try {
-        if (cacheClient && result.status < 400) {
-          const responseText = await result.clone().text()
-          const responseHeaders = {}
-          result.headers.forEach((value, name) => {
-            responseHeaders[name] = value
-          })
-
-          await cacheClient.connect()
-          await cacheClient.set(cacheKey, JSON.stringify({
-            headers: responseHeaders,
-            status: result.status,
-            data: responseText
-          }))
-          await cacheClient.expire(cacheKey, cacheTtl)
-          await cacheClient.disconnect()
-        }
+        await cacheResult(cacheClient, result.clone(), cacheKey, cacheTtl)
       } catch (e) {
         console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
       }
@@ -215,6 +252,7 @@ const sparqlProxy = (options) => {
       // content gets decoded, so remove encoding headers and recalculate length
       res.removeHeader('content-encoding')
       res.removeHeader('content-length')
+      res.removeHeader('set-cookie')
 
       res.status(forwardStatusCode(result.status))
       result.body.pipe(res)
