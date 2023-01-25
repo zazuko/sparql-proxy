@@ -1,4 +1,3 @@
-const crypto = require('crypto')
 const bodyParser = require('body-parser')
 const cloneDeep = require('lodash/cloneDeep')
 const debug = require('debug')
@@ -7,6 +6,7 @@ const fetch = require('node-fetch')
 const Router = require('express').Router
 const { createClient } = require('redis')
 const SparqlHttpClient = require('sparql-http-client')
+const { sha1, toBoolean } = require('./src/utils')
 SparqlHttpClient.fetch = fetch
 
 if (debug.enabled('trifid:*,')) {
@@ -15,16 +15,6 @@ if (debug.enabled('trifid:*,')) {
 }
 
 const logger = debug('sparql-proxy')
-
-/**
- * Get a boolean value from a string or a boolean.
- *
- * @param {boolean | string} value The value to check.
- * @returns {boolean} Boolean value.
- */
-const toBoolean = (value) => {
-  return `${value}`.toLocaleLowerCase() === 'true'
-}
 
 const forwardStatusCode = (statusCode) => {
   switch (statusCode) {
@@ -46,16 +36,6 @@ const forwardStatusCode = (statusCode) => {
 const authBasicHeader = (user, password) => {
   const base64String = Buffer.from(`${user}:${password}`).toString('base64')
   return `Basic ${base64String}`
-}
-
-/**
- * Generate a SHA1 representation of a string.
- *
- * @param {string} data Data to encrypt using SHA1.
- * @returns SHA1 representation of the `data` string.
- */
-const sha1 = (data) => {
-  return crypto.createHash('sha1').update(data, 'binary').digest('hex')
 }
 
 const getRedisClient = async (options) => {
