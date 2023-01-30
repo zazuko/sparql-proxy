@@ -4,6 +4,9 @@ const debug = require('debug')
 const defaults = require('lodash/defaults')
 const fetch = require('node-fetch')
 const Router = require('express').Router
+const { sha1 } = require('./src/utils')
+const { standardizeResponse } = require('./src/response')
+const { getRedisClient, cacheKeyName, cacheResult } = require('./src/cache')
 const SparqlHttpClient = require('sparql-http-client')
 SparqlHttpClient.fetch = fetch
 
@@ -14,21 +17,19 @@ if (debug.enabled('trifid:*,')) {
 
 const logger = debug('sparql-proxy')
 
-function forwardStatusCode (statusCode) {
-  switch (statusCode) {
-    case 404:
-      return 502
-    case 500:
-      return 502
-  }
-  return statusCode
+/**
+ * Generate the value for the Authorization header for basic authentication.
+ *
+ * @param {string} user The username.
+ * @param {string} password The password of that user.
+ * @returns {string} The value of the Authorization to use.
+ */
+const authBasicHeader = (user, password) => {
+  const base64String = Buffer.from(`${user}:${password}`).toString('base64')
+  return `Basic ${base64String}`
 }
 
-function authBasicHeader (user, password) {
-  return 'Basic ' + Buffer.from(user + ':' + password).toString('base64')
-}
-
-function sparqlProxy (options) {
+const sparqlProxy = (options) => {
   const queryOptions = {}
 
   if (options.fetchOptions) {
@@ -37,16 +38,38 @@ function sparqlProxy (options) {
 
   if (options.authentication) {
     queryOptions.headers = {
-      Authorization: authBasicHeader(options.authentication.user,
-        options.authentication.password)
+      Authorization: authBasicHeader(
+        options.authentication.user,
+        options.authentication.password
+      )
     }
   }
 
   let queryOperation = options.queryOperation || 'postQueryDirect'
   const client = new SparqlHttpClient({ endpointUrl: options.endpointUrl })
 
-  return (req, res, next) => {
+  // init cache
+  let cacheTtl = 0
+  let cachePrefix = 'default'
+  let cacheClient = null
+  const redisClientPromise = getRedisClient(logger, options.cache || {}).catch((reason) => {
+    console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to init cache', reason)
+  })
+
+  return async (req, res, next) => {
     let query
+
+    let cacheKey = `${cachePrefix}:default`
+    try {
+      const redisClient = await redisClientPromise
+      if (redisClient) {
+        cacheTtl = redisClient.ttl
+        cachePrefix = redisClient.prefix
+        cacheClient = redisClient.client.duplicate()
+      }
+    } catch (e) {
+      console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to init cache', e)
+    }
 
     if (req.method === 'GET') {
       query = req.query.query
@@ -79,17 +102,57 @@ function sparqlProxy (options) {
       }, options.timeout)
     }
 
-    return client[queryOperation](query, currentQueryOptions).then((result) => {
+    // if the cache client is configured
+    if (cacheClient) {
+      cacheKey = query
+        ? cacheKeyName(cachePrefix, sha1(query))
+        : cacheKeyName(cachePrefix, 'get-query')
+
+      try {
+        // try to get the result from the cache
+        await cacheClient.connect()
+        const cacheResponse = await cacheClient.get(cacheKey)
+        await cacheClient.disconnect()
+
+        // if the cache contains the entry
+        if (cacheResponse) {
+          const jsonResponse = JSON.parse(cacheResponse)
+          const cacheData = jsonResponse.data || ''
+          const cacheHeaders = jsonResponse.headers || {}
+          const cacheStatus = jsonResponse.status || 500
+          Object.entries(cacheHeaders).forEach((header) => {
+            res.setHeader(header[0], header[1])
+          })
+
+          logger(`cache: use response from '${cacheKey}' entry: ${cacheData}`)
+          standardizeResponse(res, cacheStatus)
+          res.send(cacheData)
+
+          return
+        }
+
+        // if not, continue to run the code
+      } catch (e) {
+        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to get cache entry', e)
+      }
+    }
+
+    // if the query was not cached, then we run it against the triplestore endpoint
+    return client[queryOperation](query, currentQueryOptions).then(async (result) => {
       const time = Date.now() - timeStart
+
+      // store results in cache, but don't make the app crash in case of issue
+      try {
+        await cacheResult(cacheClient, result.clone(), cacheKey, cacheTtl)
+      } catch (e) {
+        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
+      }
+
       result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
 
-      // content gets decoded, so remove encoding headers and recalculate length
-      res.removeHeader('content-encoding')
-      res.removeHeader('content-length')
-
-      res.status(forwardStatusCode(result.status))
+      standardizeResponse(res, result.status)
       result.body.pipe(res)
       if (debug.enabled('sparql-proxy')) {
         return result.text().then((text) => {
@@ -109,7 +172,7 @@ function sparqlProxy (options) {
   }
 }
 
-function factory (options) {
+const factory = (options) => {
   const router = new Router()
 
   router.use(bodyParser.text({ type: 'application/sparql-query' }))
