@@ -5,6 +5,7 @@ const defaults = require('lodash/defaults')
 const fetch = require('node-fetch')
 const Router = require('express').Router
 const { sha1 } = require('./src/utils')
+const { standardizeResponse } = require('./src/response')
 const { getRedisClient, cacheKeyName, cacheResult } = require('./src/cache')
 const SparqlHttpClient = require('sparql-http-client')
 SparqlHttpClient.fetch = fetch
@@ -15,16 +16,6 @@ if (debug.enabled('trifid:*,')) {
 }
 
 const logger = debug('sparql-proxy')
-
-const forwardStatusCode = (statusCode) => {
-  switch (statusCode) {
-    case 404:
-      return 502
-    case 500:
-      return 502
-  }
-  return statusCode
-}
 
 /**
  * Generate the value for the Authorization header for basic authentication.
@@ -111,6 +102,7 @@ const sparqlProxy = (options) => {
       }, options.timeout)
     }
 
+    // if the cache client is configured
     if (cacheClient) {
       cacheKey = query
         ? cacheKeyName(cachePrefix, sha1(query))
@@ -122,6 +114,7 @@ const sparqlProxy = (options) => {
         const cacheResponse = await cacheClient.get(cacheKey)
         await cacheClient.disconnect()
 
+        // if the cache contains the entry
         if (cacheResponse) {
           const jsonResponse = JSON.parse(cacheResponse)
           const cacheData = jsonResponse.data || ''
@@ -131,22 +124,20 @@ const sparqlProxy = (options) => {
             res.setHeader(header[0], header[1])
           })
 
-          // content gets decoded, so remove encoding headers and recalculate length
-          res.removeHeader('content-encoding')
-          res.removeHeader('content-length')
-          res.removeHeader('set-cookie')
-
-          res.status(forwardStatusCode(cacheStatus))
           logger(`cache: use response from '${cacheKey}' entry: ${cacheData}`)
+          standardizeResponse(res, cacheStatus)
           res.send(cacheData)
 
           return
         }
+
+        // if not, continue to run the code
       } catch (e) {
         console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to get cache entry', e)
       }
     }
 
+    // if the query was not cached, then we run it against the triplestore endpoint
     return client[queryOperation](query, currentQueryOptions).then(async (result) => {
       const time = Date.now() - timeStart
 
@@ -161,12 +152,7 @@ const sparqlProxy = (options) => {
         res.setHeader(name, value)
       })
 
-      // content gets decoded, so remove encoding headers and recalculate length
-      res.removeHeader('content-encoding')
-      res.removeHeader('content-length')
-      res.removeHeader('set-cookie')
-
-      res.status(forwardStatusCode(result.status))
+      standardizeResponse(res, result.status)
       result.body.pipe(res)
       if (debug.enabled('sparql-proxy')) {
         return result.text().then((text) => {
