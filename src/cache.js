@@ -13,7 +13,7 @@ const getRedisClient = async (logger, options) => {
   if (!url || toBoolean(disabled)) {
     return null
   }
-  logger(`Cache: enabled.`)
+  logger('Cache: enabled.')
 
   const cachePrefix = prefix || 'default'
   const cacheTtl = ttl ? parseInt(`${ttl}`, 10) : 60 * 60
