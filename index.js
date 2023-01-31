@@ -141,23 +141,30 @@ const sparqlProxy = (options) => {
     return client[queryOperation](query, currentQueryOptions).then(async (result) => {
       const time = Date.now() - timeStart
 
-      // store results in cache, but don't make the app crash in case of issue
-      try {
-        await cacheResult(cacheClient, result.clone(), cacheKey, cacheTtl)
-      } catch (e) {
-        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
-      }
+      // We faced the following issue: https://github.com/node-fetch/node-fetch/issues/1568
+      // When the `await cacheResult` part was called before and for big responses (>32kib).
+      // Since it is "blocking" and the backpressure is only 32kib.
+      // For bigger responses, it was making the app hang.
+
+      const resultClone = result.clone()
 
       result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
-
       standardizeResponse(res, result.status)
       result.body.pipe(res)
+
       if (debug.enabled('sparql-proxy')) {
         return result.text().then((text) => {
           logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
         })
+      }
+
+      // store results in cache, but don't make the app crash in case of issue
+      try {
+        await cacheResult(cacheClient, resultClone, cacheKey, cacheTtl)
+      } catch (e) {
+        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
       }
     }).catch((reason) => {
       if (reason.code === 'ETIMEDOUT') {
