@@ -2,12 +2,21 @@
 
 const assert = require('assert')
 const express = require('express')
+const { afterEach } = require('mocha')
 const nock = require('nock')
 const request = require('supertest')
 const sparqlProxy = require('..')
 
 describe('redis cache for sparql-proxy', () => {
   const query = 'SELECT * WHERE {?s ?p ?o.} LIMIT 10'
+
+  afterEach(() => {
+    // make sure that all nock interceptors were used or make the test fail
+    if (!nock.isDone()) {
+      nock.cleanAll()
+      throw new Error('Not all nock interceptors were used!')
+    }
+  })
 
   it('should start without crash (reset cache + simple request)', async () => {
     const app = express()
@@ -127,7 +136,6 @@ describe('redis cache for sparql-proxy', () => {
 
     nock('http://example.org')
       .post('/query')
-      .times(3)
       .reply(200, (_uri, _body) => {
         return counter++
       })
@@ -135,7 +143,8 @@ describe('redis cache for sparql-proxy', () => {
     app.use('/query', sparqlProxy({
       endpointUrl: 'http://example.org/query',
       cache: {
-        url: 'redis://127.0.0.1:6379'
+        url: 'redis://127.0.0.1:6379',
+        clearAtStartup: true
       }
     }))
 
@@ -177,6 +186,7 @@ describe('redis cache for sparql-proxy', () => {
       endpointUrl: 'http://example.org/query',
       cache: {
         url: 'redis://127.0.0.1:6379',
+        clearAtStartup: true,
         disabled: true
       }
     }))
@@ -210,7 +220,7 @@ describe('redis cache for sparql-proxy', () => {
 
     nock('http://example.org')
       .post('/query')
-      .times(3)
+      .times(2)
       .reply(200, (_uri, _body) => {
         return counter++
       })
