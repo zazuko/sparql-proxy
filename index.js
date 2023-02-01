@@ -59,6 +59,9 @@ const sparqlProxy = (options) => {
   return async (req, res, next) => {
     let query
 
+    const acceptHeaderValue = req.get('Accept') || 'default'
+    const acceptHeaderCacheKey = sha1(`${acceptHeaderValue}`.toLocaleLowerCase())
+
     let cacheKey = `${cachePrefix}:default`
     try {
       const redisClient = await redisClientPromise
@@ -105,8 +108,8 @@ const sparqlProxy = (options) => {
     // if the cache client is configured
     if (cacheClient) {
       cacheKey = query
-        ? cacheKeyName(cachePrefix, sha1(query))
-        : cacheKeyName(cachePrefix, 'get-query')
+        ? cacheKeyName(cachePrefix, acceptHeaderCacheKey, sha1(query))
+        : cacheKeyName(cachePrefix, acceptHeaderCacheKey, 'get-query')
 
       try {
         // try to get the result from the cache

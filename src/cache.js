@@ -48,11 +48,12 @@ const getRedisClient = async (logger, options) => {
  * Generate a cache key using a prefix.
  *
  * @param {string} prefix The prefix to use for the cache key.
+ * @param {string} accept A deterministic value representing the Accept header.
  * @param {string} name The name of the key to use for the cache.
  * @returns {string} The prefixed cache key.
  */
-const cacheKeyName = (prefix, name) => {
-  return `${prefix}:${name}`
+const cacheKeyName = (prefix, accept, name) => {
+  return `${prefix}:${accept}:${name}`
 }
 
 /**
