@@ -185,8 +185,33 @@ const sparqlProxy = (options) => {
 const factory = (options) => {
   const router = new Router()
 
+  const { rewriteQueries } = options
+
   router.use(bodyParser.text({ type: 'application/sparql-query' }))
   router.use(bodyParser.urlencoded({ extended: false }))
+
+  if (rewriteQueries && rewriteQueries !== 'false') {
+    router.use((req, res, next) => {
+      if (!res.locals.camouflageRewriteOriginalUrl) {
+        return next()
+      }
+
+      if (req.body && typeof req.body !== 'string') {
+        const currentUrl = new URL('/', req.absoluteUrl()).toString()
+        const realUrl = new URL('/', res.locals.camouflageRewriteOriginalUrl).toString()
+
+        const newBody = Object.create(null)
+        for (const [key, value] of Object.entries(req.body)) {
+          newBody[key] = `${value}`.replace(realUrl, currentUrl)
+        }
+
+        req.body = newBody
+      }
+
+      next()
+    })
+  }
+
   router.use(sparqlProxy(options))
 
   return router
