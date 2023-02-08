@@ -200,11 +200,11 @@ const factory = (options) => {
       const realUrl = new URL('/', res.locals.camouflageRewriteOriginalUrl).toString()
 
       if (req.body && req.body.query) {
-        req.body.query = `${req.body.query}`.replace(realUrl, currentUrl)
+        req.body.query = `${req.body.query}`.replaceAll(realUrl, currentUrl)
       }
 
       if (req.query && req.query.query) {
-        req.query.query = `${req.query.query}`.replace(realUrl, currentUrl)
+        req.query.query = `${req.query.query}`.replaceAll(realUrl, currentUrl)
       }
 
       next()
