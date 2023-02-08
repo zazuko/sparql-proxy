@@ -196,16 +196,15 @@ const factory = (options) => {
         return next()
       }
 
-      if (req.body && typeof req.body !== 'string') {
-        const currentUrl = new URL('/', req.absoluteUrl()).toString()
-        const realUrl = new URL('/', res.locals.camouflageRewriteOriginalUrl).toString()
+      const currentUrl = new URL('/', req.absoluteUrl()).toString()
+      const realUrl = new URL('/', res.locals.camouflageRewriteOriginalUrl).toString()
 
-        const newBody = Object.create(null)
-        for (const [key, value] of Object.entries(req.body)) {
-          newBody[key] = `${value}`.replace(realUrl, currentUrl)
-        }
+      if (req.body && req.body.query) {
+        req.body.query = `${req.body.query}`.replace(realUrl, currentUrl)
+      }
 
-        req.body = newBody
+      if (req.query && req.query.query) {
+        req.query.query = `${req.query.query}`.replace(realUrl, currentUrl)
       }
 
       next()
