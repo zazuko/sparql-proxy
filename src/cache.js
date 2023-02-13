@@ -65,8 +65,9 @@ const cacheKeyName = (prefix, accept, name) => {
  * @param {number} cacheTtl TTL for the cache entry.
  */
 const cacheResult = async (cacheClient, result, cacheKey, cacheTtl) => {
+  const responseText = await result.text()
+
   if (cacheClient && result.status < 400) {
-    const responseText = await result.text()
     const responseHeaders = {}
     result.headers.forEach((value, name) => {
       responseHeaders[name] = value
