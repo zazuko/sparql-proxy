@@ -60,13 +60,12 @@ const cacheKeyName = (prefix, accept, name) => {
  * Store an entry in the cache.
  *
  * @param {import('@redis/client').RedisClientType} cacheClient Redis client.
+ * @param {string} responseText Response body.
  * @param {Response} result Response to store in the cache.
  * @param {string} cacheKey key for the cache entry.
  * @param {number} cacheTtl TTL for the cache entry.
  */
-const cacheResult = async (cacheClient, result, cacheKey, cacheTtl) => {
-  const responseText = await result.text()
-
+const cacheResult = async (cacheClient, responseText, result, cacheKey, cacheTtl) => {
   if (cacheClient && result.status < 400) {
     const responseHeaders = {}
     result.headers.forEach((value, name) => {

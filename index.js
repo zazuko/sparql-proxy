@@ -157,15 +157,14 @@ const sparqlProxy = (options) => {
       standardizeResponse(res, result.status)
       result.body.pipe(res)
 
+      const text = await resultClone.text()
       if (debug.enabled('sparql-proxy')) {
-        return result.text().then((text) => {
-          logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
-        })
+        logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
       }
 
       // store results in cache, but don't make the app crash in case of issue
       try {
-        await cacheResult(cacheClient, resultClone, cacheKey, cacheTtl)
+        await cacheResult(cacheClient, text, resultClone, cacheKey, cacheTtl)
       } catch (e) {
         console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
       }
