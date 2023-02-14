@@ -4,7 +4,7 @@ const debug = require('debug')
 const defaults = require('lodash/defaults')
 const fetch = require('node-fetch')
 const Router = require('express').Router
-const { sha1 } = require('./src/utils')
+const { sha1, streamToText } = require('./src/utils')
 const { standardizeResponse } = require('./src/response')
 const { getRedisClient, cacheKeyName, cacheResult } = require('./src/cache')
 const SparqlHttpClient = require('sparql-http-client')
@@ -144,27 +144,29 @@ const sparqlProxy = (options) => {
     return client[queryOperation](query, currentQueryOptions).then(async (result) => {
       const time = Date.now() - timeStart
 
-      // We faced the following issue: https://github.com/node-fetch/node-fetch/issues/1568
-      // When the `await cacheResult` part was called before and for big responses (>32kib).
-      // Since it is "blocking" and the backpressure is only 32kib.
-      // For bigger responses, it was making the app hang.
-
       result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
       standardizeResponse(res, result.status)
+
       result.body.pipe(res)
 
-      const text = await result.text()
-      if (debug.enabled('sparql-proxy')) {
-        logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
-      }
+      const { length, text } = await streamToText(result.body, 1024 * 1024 * 8)
+      if (text) {
+        if (debug.enabled('sparql-proxy')) {
+          logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
+        }
 
-      // store results in cache, but don't make the app crash in case of issue
-      try {
-        await cacheResult(cacheClient, text, result, cacheKey, cacheTtl)
-      } catch (e) {
-        console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
+        // store results in cache, but don't make the app crash in case of issue
+        try {
+          await cacheResult(cacheClient, text, result, cacheKey, cacheTtl)
+        } catch (e) {
+          console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
+        }
+      } else {
+        if (debug.enabled('sparql-proxy')) {
+          logger(`HTTP${result.status} in ${time}ms; body too large to cache and log (length: ${length})`)
+        }
       }
     }).catch((reason) => {
       if (reason.code === 'ETIMEDOUT') {
