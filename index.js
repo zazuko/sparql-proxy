@@ -149,22 +149,20 @@ const sparqlProxy = (options) => {
       // Since it is "blocking" and the backpressure is only 32kib.
       // For bigger responses, it was making the app hang.
 
-      const resultClone = result.clone()
-
       result.headers.forEach((value, name) => {
         res.setHeader(name, value)
       })
       standardizeResponse(res, result.status)
       result.body.pipe(res)
 
-      const text = await resultClone.text()
+      const text = await result.text()
       if (debug.enabled('sparql-proxy')) {
         logger(`HTTP${result.status} in ${time}ms; body: ${text}`)
       }
 
       // store results in cache, but don't make the app crash in case of issue
       try {
-        await cacheResult(cacheClient, text, resultClone, cacheKey, cacheTtl)
+        await cacheResult(cacheClient, text, result, cacheKey, cacheTtl)
       } catch (e) {
         console.error('ERROR[sparql-proxy/cache]: something went wrong while trying to save the entry in cache', e)
       }
