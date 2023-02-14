@@ -206,7 +206,7 @@ describe('sparql-proxy', () => {
     const app = express()
 
     app.use('/query', sparqlProxy({
-      endpointUrl: 'http://non-reachable.org/404'
+      endpointUrl: 'http://127.0.0.1:11223/404'
     }))
 
     await request(app)

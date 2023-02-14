@@ -23,7 +23,7 @@ const sha1 = (data) => {
 /**
  * Convert a stream to a string, with a maximum length.
  *
- * @param {ReadableStream} stream The stream to read.
+ * @param {import('node:stream').Readable} stream The stream to read.
  * @param {number} limit The maximum length.
  * @returns {Promise<{length: number, text: string | null}>}
  */
