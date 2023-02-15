@@ -20,6 +20,11 @@ const forwardStatusCode = (statusCode) => {
  * @param {import('express').Response} res Response.
  */
 const standardizeResponse = (res, statusCode) => {
+  // don't try to change headers if they were already sent
+  if (res.headersSent) {
+    return
+  }
+
   // content gets decoded, so remove encoding headers and recalculate length
   res.removeHeader('content-encoding')
   res.removeHeader('content-length')

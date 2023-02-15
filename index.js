@@ -175,7 +175,8 @@ const sparqlProxy = (options) => {
         reason.code === 'ECONNREFUSED') {
         res.status(502).send(reason)
       } else {
-        next()
+        console.error('[ERROR] The following error was catched in sparql-proxy:', reason)
+        res.status(502).send('Oops! Something went wrong while reaching the endpoint. Please try again later.')
       }
     })
   }
