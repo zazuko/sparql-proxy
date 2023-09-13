@@ -83,9 +83,9 @@ const sparqlProxy = (options) => {
       return
     }
 
-    logger('handle SPARQL request for endpoint: ' + options.endpointUrl)
+    logger(`handle SPARQL request for endpoint: ${options.endpointUrl}`)
     if (query) {
-      logger('SPARQL query:' + query)
+      logger(`SPARQL query: ${JSON.stringify(query)}`)
     } else {
       logger('No SPARQL query; issuing a GET')
       queryOperation = 'getQuery'
